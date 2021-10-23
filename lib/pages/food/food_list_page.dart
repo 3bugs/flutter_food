@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_food/helpers/platform_aware_asset_image.dart';
 import 'package:flutter_food/models/food_item.dart';
 import 'package:flutter_food/pages/food/food_details_page.dart';
+import 'package:flutter_food/services/api.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class FoodListPage extends StatefulWidget {
@@ -14,7 +15,16 @@ class FoodListPage extends StatefulWidget {
 }
 
 class _FoodListPageState extends State<FoodListPage> {
-  var items = [
+  late Future<List<FoodItem>> _futureFoodList;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _futureFoodList = _loadFoods();
+  }
+
+  /*var items = [
     FoodItem(
       id: 1,
       name: 'ข้าวไข่เจียว',
@@ -69,68 +79,102 @@ class _FoodListPageState extends State<FoodListPage> {
       price: 80,
       image: 'som_tum_kai_yang.jpg',
     )
-  ];
+  ];*/
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      child: ListView.builder(
-        padding: EdgeInsets.all(8.0),
-        itemCount: items.length,
-        itemBuilder: (BuildContext context, int index) {
-          var foodItem = items[index];
+      child: FutureBuilder<List<FoodItem>>(
+        future: _futureFoodList,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return Center(
+              child: CircularProgressIndicator(),
+            );
+          }
 
-          return Card(
-            clipBehavior: Clip.antiAliasWithSaveLayer,
-            margin: EdgeInsets.all(8.0),
-            elevation: 5.0,
-            shadowColor: Colors.black.withOpacity(0.2),
-            child: InkWell(
-              onTap: () => _handleClickFoodItem(foodItem),
-              child: Row(
-                children: <Widget>[
-                  PlatformAwareAssetImage(
-                    assetPath: 'assets/images/${foodItem.image}',
-                    width: 80.0,
-                    height: 80.0,
-                    fit: BoxFit.cover,
-                  ),
-                  /*Image.asset(
-                    'assets/images/${foodItem.image}',
-                    width: 80.0,
-                    height: 80.0,
-                    fit: BoxFit.cover,
-                  ),*/
-                  Expanded(
-                    child: Container(
-                      padding: EdgeInsets.all(10.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: <Widget>[
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-                                foodItem.name,
-                                style: GoogleFonts.prompt(fontSize: 20.0),
-                              ),
-                              Text(
-                                '${foodItem.price.toString()} บาท',
-                                style: GoogleFonts.prompt(fontSize: 15.0),
-                              ),
-                            ],
+          if (snapshot.hasData) {
+            var foodList = snapshot.data;
+            return ListView.builder(
+              padding: EdgeInsets.all(8.0),
+              itemCount: foodList!.length,
+              itemBuilder: (BuildContext context, int index) {
+                var foodItem = foodList[index];
+
+                return Card(
+                  clipBehavior: Clip.antiAliasWithSaveLayer,
+                  margin: EdgeInsets.all(8.0),
+                  elevation: 5.0,
+                  shadowColor: Colors.black.withOpacity(0.2),
+                  child: InkWell(
+                    onTap: () => _handleClickFoodItem(foodItem),
+                    child: Row(
+                      children: <Widget>[
+                        Image.network(
+                          foodItem.image,
+                          width: 80.0,
+                          height: 80.0,
+                          fit: BoxFit.cover,
+                        ),
+                        Expanded(
+                          child: Container(
+                            padding: EdgeInsets.all(10.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: <Widget>[
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    Text(
+                                      foodItem.name,
+                                      style: GoogleFonts.prompt(fontSize: 20.0),
+                                    ),
+                                    Text(
+                                      '${foodItem.price.toString()} บาท',
+                                      style: GoogleFonts.prompt(fontSize: 15.0),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
+                );
+              },
+            );
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('ผิดพลาด: ${snapshot.error}'),
+                  ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _futureFoodList = _loadFoods();
+                        });
+                      },
+                      child: Text('ลองใหม่')),
                 ],
               ),
-            ),
-          );
+            );
+          }
+
+          return SizedBox.shrink();
         },
       ),
     );
+  }
+
+  Future<List<FoodItem>> _loadFoods() async {
+    List list = await Api().fetch('foods');
+    var foodList = list.map((item) => FoodItem.fromJson(item)).toList();
+    return foodList;
   }
 
   _handleClickFoodItem(FoodItem foodItem) {
